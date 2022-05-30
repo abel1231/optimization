@@ -69,7 +69,6 @@ exp_ret, cov_mat = data_preprocessing(file_path)
 exp_ret = exp_ret.to_numpy()
 cov_mat = cov_mat.to_numpy()
 
-
 budget = 3
 # Gf = 1.0 / (2 ** (g - 1)) # granularity
 Gf = 1 / 3.0
