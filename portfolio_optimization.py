@@ -16,8 +16,8 @@ def data_preprocessing(file_path):
         RoR[i,:] = (data[i+1,:]-data[i,:])/data[i,:]
     ## Calculate the expected return and covariance matrix
     data_df = pd.DataFrame(RoR)
-    exp_ret = data_df.mean() * data.shape[0]
-    cov_mat = data_df.cov() * data.shape[0]
+    exp_ret = data_df.mean()
+    cov_mat = data_df.cov()
     return exp_ret, cov_mat
     
 if __name__=="__main__":

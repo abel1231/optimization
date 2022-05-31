@@ -2,6 +2,30 @@ from pyqpanda import *
 import numpy as np
 from portfolio_optimization import data_preprocessing
 import time
+from qiskit_opt import qiskit_coef
+
+def op_to_coef(operator, num_qubit):
+    h = np.zeros(num_qubit)
+    J = np.zeros((num_qubit, num_qubit))
+    coeff_list = []
+    assert operator.coeff == 1
+    for PauliOp in operator.to_pauli_op():
+        coeff = PauliOp.coeff
+        nPauli = str(PauliOp)[-num_qubit:]
+        z_index = [i for i in range(len(nPauli)) if nPauli[i] == 'Z']
+        coeff_list.append([z_index, coeff])
+
+    for ls in coeff_list:
+        index = ls[0]
+        coeff = ls[1]
+        if len(index) == 1:
+            h[index[0]] = coeff
+        elif len(index) == 2:
+            J[index[0]][index[1]] = coeff
+        else:
+            raise AssertionError()
+
+    return J, h
 
 def oneCircuit(qlist, Hamiltonian, beta, gamma):
     vqc=VariationalQuantumCircuit()
@@ -64,6 +88,7 @@ def oneCircuit(qlist, Hamiltonian, beta, gamma):
 
     return vqc
 
+
 file_path = "./data/stock_data.xlsx"
 exp_ret, cov_mat = data_preprocessing(file_path)
 exp_ret = exp_ret.to_numpy()
@@ -75,15 +100,29 @@ theta1 = 1
 theta2 = 2.5
 theta3 = 1
 num_assets = 6
-epoch = 100
+epoch = 500
 
 num_qubit = num_assets
 machine = init_quantum_machine(QMachineType.CPU)
 
 qlist = machine.qAlloc_many(num_qubit)
 
+# 利用qiskit计算系数
+operator, offset = qiskit_coef(exp_ret, cov_mat, budget=budget, q=2.5)
+print(operator)
+assert isinstance(offset,float)
+J_q, h_q = op_to_coef(operator, num_qubit)
+
 J = (theta2 * cov_mat + theta3 * budget**2 * Gf**2) / 4
 h = (theta1 * exp_ret) / 2 + theta3 * budget**2 * Gf * (1-num_assets*Gf/2) - theta2 / 4 * (np.sum(cov_mat,axis=0) + np.sum(cov_mat,axis=1))
+
+print('########### Qiskit\'s J and h ###########')
+print('J_q \n {}'.format(J_q))
+print('h_q \n {}'.format(h_q))
+
+print('########### Our J and h ###########')
+print('J \n {}'.format(J))
+print('h \n {}'.format(h))
 
 problem = {}
 
@@ -98,7 +137,7 @@ for i in range(num_qubit):
 
 Hp = PauliOperator(problem)
 print(Hp)
-step = 2
+step = 5
 
 beta = var(np.ones((step,1),dtype = 'float64'), True)
 gamma = var(np.ones((step,1),dtype = 'float64'), True)
@@ -121,8 +160,8 @@ loss_value_min = 0
 count = 0
 start = time.time()
 for i in range(epoch):
-    if count > 100:
-        break
+    # if count > 100:
+    #     break
     start_local = time.time()
     optimizer.run(leaves, 0)
     loss_value = optimizer.get_loss()
@@ -134,6 +173,7 @@ for i in range(epoch):
         count = 0
     loss_value_his = loss_value
     print("epoch:", i, " loss: {:.8f}".format(loss_value), " time: {:.2f}s".format(time.time() - start_local))
+
 
 print("Training done! Total elapsed time:{:.2f}s".format(time.time()-start))
 # 验证结果
