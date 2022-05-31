@@ -29,8 +29,9 @@ def calc_h():
     con2 = np.sum(np.array(seq))
     for i in range(num_assets):
         for k in range(num_slices):
-            h[i*num_slices + k] = 2**(k-1) * (theta1 * exp_ret[i] - 2 * theta3 * Gf * budget**2 * (num_assets * Gf * con1 - 1) - theta2 / 4.0 * con2 * (np.sum(cov_mat,axis=1)[i] + np.sum(cov_mat,axis=0)[i]))
-
+            h[i * num_slices + k] = 2 ** (k - 1) * (theta1 * exp_ret[i] -
+                                                    2 * theta3 * Gf * budget ** 2 * (num_assets * Gf * con1 - 1) -
+                                                    theta2 / 4.0 * con2 * (np.sum(cov_mat, axis=1)[i] + np.sum(cov_mat, axis=0)[i]))
     return h
 
 def problem_PauliOperator(h, J):
@@ -122,14 +123,14 @@ def test_coef(J, h):
 
 def print_result(result, shoots):
     print("\n----------------- Full result ---------------------")
-    print("selection\tvalue\t\tprobability")
+    print("rank\tselection\tvalue\t\tprobability")
     print("---------------------------------------------------")
     for i in range(len(result)):
         x, freq = result[i]
         value = 0.0
         # value = portfolio.to_quadratic_program().objective.evaluate(x)
         probability = freq / shoots
-        print("%-10s\t%.8f\t\t%.8f" % (x, value, probability))
+        print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x, value, probability))
 
 if __name__ == '__main__':
     # 初始化参数
@@ -197,6 +198,7 @@ if __name__ == '__main__':
         for layer in range(layers):
             vqc.insert(oneCircuit(qlist, Hp.toHamiltonian(1), beta[layer], gamma[layer]))
 
+    print('\nCircuit Initialization Complete! Start Training...')
     # 计算loss, 并指定优化器
     loss = qop(vqc, Hp, machine, qlist)
     optimizer = AdamOptimizer.minimize(loss,  # 损失函数
@@ -227,7 +229,7 @@ if __name__ == '__main__':
             count = 0
         loss_value_his = loss_value
         print("epoch:", i, " loss: {:.8f}".format(loss_value), " time: {:.2f}s".format(time.time() - start_local))
-    print("Training done! Total elapsed time:{:.2f}s".format(time.time()-start))
+    print("\nTraining done! Total elapsed time:{:.2f}s".format(time.time()-start))
 
     # 打印结果, 输出是通过measure得到的二进制字符串, 以及其出现的次数
     prog = QProg()
@@ -239,8 +241,3 @@ if __name__ == '__main__':
     result = quick_measure(qlist, shoots)
     result_sorted = sorted(result.items(), key = lambda kv:(kv[1], kv[0]), reverse=True)
     print_result(result_sorted, shoots)
-
-
-
-
-

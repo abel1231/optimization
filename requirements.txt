@@ -6,3 +6,4 @@ qpsolvers==1.7.0
 cvxopt==1.2.6
 xlrd==1.2.0
 scipy==1.5.4
+qiskit==0.34.2
