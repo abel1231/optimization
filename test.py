@@ -113,7 +113,7 @@ print(operator)
 assert isinstance(offset,float)
 J_q, h_q = op_to_coef(operator, num_qubit)
 
-J = (theta2 * cov_mat + theta3 * budget**2 * Gf**2) / 4
+J = (theta2 * cov_mat + theta3 * budget**2 * Gf**2) / 4 * 2
 h = (theta1 * exp_ret) / 2 + theta3 * budget**2 * Gf * (1-num_assets*Gf/2) - theta2 / 4 * (np.sum(cov_mat,axis=0) + np.sum(cov_mat,axis=1))
 
 print('########### Qiskit\'s J and h ###########')

@@ -268,7 +268,7 @@ def qiskit_coef(mu, sigma, budget, q):
     cobyla = COBYLA()
     cobyla.set_options(maxiter=250)
     quantum_instance = QuantumInstance(backend=backend, seed_simulator=seed, seed_transpiler=seed)
-    qaoa_mes = QAOA(optimizer=cobyla, reps=3, quantum_instance=quantum_instance)
+    qaoa_mes = QAOA(optimizer=cobyla, reps=18, quantum_instance=quantum_instance)
     qaoa = MinimumEigenOptimizer(qaoa_mes)
     operator, offset = qaoa.solve(qp)
     return operator, offset
