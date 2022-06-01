@@ -215,6 +215,7 @@ expectation = get_expectation(qc, para_list, Pauli_sum.to_matrix())
 res = minimize(expectation,
                np.ones(layers * 2),
                method='COBYLA')
+print('\nTraining Done! The output of optimizer: ')
 print(res)
 
 # 打印结果
