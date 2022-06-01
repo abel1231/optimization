@@ -39,7 +39,7 @@ def problem_PauliOperator(h, J):
     Calculate the Pauli operator for given coefficients h and J
     :param h: coefficients of one-body terms
     :param J: coefficients of two-body terms
-    :return: a PauliOperator containing the Pauli operator and its corresponding coefficient
+    :return: a PauliOperator containing the Pauli operators and its corresponding coefficients
     '''
     problem = {} # a dict containing the Pauli operator and its corresponding coefficient, such as {"Z0 Z1": 2.7, 'Z2': 1.6}
     for i in range(num_qubits):
@@ -210,7 +210,7 @@ if __name__ == '__main__':
     leaves = optimizer.get_variables()
 
     loss_value_his = 0
-    loss_value_min = 0
+    loss_value_min = 1e6
     count = 0
     start = time.time()
     # 开始训练
