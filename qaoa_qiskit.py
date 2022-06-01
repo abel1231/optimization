@@ -1,6 +1,8 @@
 from qiskit import QuantumCircuit, transpile
 from qiskit import Aer
 from qiskit.circuit import Parameter
+from qiskit.providers.aer import StatevectorSimulator
+
 from portfolio_optimization import data_preprocessing
 import numpy as np
 from qiskit.opflow import PauliSumOp
@@ -158,7 +160,7 @@ def print_result(circuit, para_list, solution):
         value = 0.0
         # value = portfolio.to_quadratic_program().objective.evaluate(x)
         probability = np.abs(amplitude) ** 2
-        print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x, value, probability))
+        print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x[::-1], value, probability))
 
 
 # 初始化参数
