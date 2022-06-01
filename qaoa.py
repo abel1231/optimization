@@ -147,7 +147,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
     parser.add_argument('--momentum', type=float, default=0.9, help='Initial momentum of SGD.')
     parser.add_argument('--visual', action='store_true', default=False, help='Print the Pauli Operator of the problem.')
-    parser.add_argument('--patience', type=int, default=20, help='Stop training if loss does not decrease significantly in patience steps.')
+    parser.add_argument('--patience', type=int, default=20, help='Stop training if loss does not decrease significantly within patience steps.')
     parser.add_argument('--data_path', type=str, default="./data/stock_data.xlsx", help='The path where the original data is stored.')
     args = parser.parse_args()
 
@@ -156,7 +156,7 @@ if __name__ == '__main__':
     theta3 = args.theta3
     budget = args.budget
     num_assets = args.num_assets
-    num_slices = args.g  # the number of slices of the budget (g in the paper)
+    num_slices = args.g  # The number of binary bits required to represent one asset (g in the paper)
     Gf = args.Gf
     layers = args.layers
     epochs = args.epochs
@@ -215,9 +215,8 @@ if __name__ == '__main__':
     start = time.time()
     # 开始训练
     for i in range(epochs):
-        # 当连续20个epoch输出的loss没有太大变化, 提前停止训练
         if count > args.patience:
-            break
+            break # 当连续patience个epoch输出的loss没有太大变化, 提前停止训练
         start_local = time.time()
         optimizer.run(leaves, 0)
         loss_value = optimizer.get_loss()
@@ -231,13 +230,13 @@ if __name__ == '__main__':
         print("epoch:", i, " loss: {:.8f}".format(loss_value), " time: {:.2f}s".format(time.time() - start_local))
     print("\nTraining done! Total elapsed time:{:.2f}s".format(time.time()-start))
 
-    # 打印结果, 输出是通过measure得到的二进制字符串, 以及其出现的次数
+    # 打印结果, 输出是通过measure得到的二进制字符串, 以及其出现的概率
     prog = QProg()
     qcir = vqc.feed()
     prog.insert(qcir)
     directly_run(prog)
 
-    shoots = int(1e6)
+    shoots = int(1e6)  # measure次数
     result = quick_measure(qlist, shoots)
     result_sorted = sorted(result.items(), key = lambda kv:(kv[1], kv[0]), reverse=True)
     print_result(result_sorted, shoots)
