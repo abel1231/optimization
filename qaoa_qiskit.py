@@ -163,8 +163,8 @@ def print_result(circuit, Hamiltonian, para_list, solution):
     for i in statevector:
         statevector[i] = np.abs(np.array(statevector[i])) ** 2
         a = a + statevector[i]
-    print('a: %f' % a)
-    print(statevector)
+    # print('a: %f' % a)
+    # print(statevector)
     result = sorted(statevector.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)
     # print(result)
     mm = []
@@ -175,7 +175,7 @@ def print_result(circuit, Hamiltonian, para_list, solution):
     value_mm = np.sum((mm @ Hamiltonian) * mm, axis=1)
 
     min_index = np.argmin(value_mm)
-    print("\nOptimal: selection {}, value {:.8f}".format(result[min_index][0], value_mm[min_index]))
+    print("\nOptimal: selection {}, value {:.8f}".format(result[min_index][0][::-1], value_mm[min_index]))
 
     print("\n----------------- Full result ---------------------")
     print("rank\tselection\tvalue\t\tprobability")
@@ -186,7 +186,7 @@ def print_result(circuit, Hamiltonian, para_list, solution):
         assert np.imag(value) < 1e-10
         value = np.real(value)
         # value = portfolio.to_quadratic_program().objective.evaluate(x)
-        print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x, value, probability))
+        print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x[::-1], value, probability))
 
 
 # 初始化参数
@@ -197,7 +197,7 @@ theta2 = 2.5 * Gf * Gf
 theta3 = 1
 num_assets = 6
 num_slices = 1  # The number of binary bits required to represent one asset (g in the paper)
-layers = 2
+layers = 6
 
 num_qubits = num_assets * num_slices
 
