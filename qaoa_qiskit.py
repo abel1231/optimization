@@ -201,6 +201,7 @@ layers = 6
 
 num_qubits = num_assets * num_slices
 
+np.random.seed(12345)
 # 读取收益和方差
 file_path = "./data/stock_data.xlsx"
 exp_ret, cov_mat = data_preprocessing(file_path)
@@ -241,20 +242,24 @@ expectation = get_expectation(qc, para_list, Pauli_sum.to_matrix())
 
 # 优化参数
 start = time.time()
-# res = minimize(expectation,
-#                np.ones(layers * 2),
-#                method='COBYLA')
-# print('\nTraining Done! The output of optimizer: ')
-# print(res)
-
-optimizer = COBYLA(maxiter=1000, tol=0.0001)
-res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
+if 1:
+    res = minimize(expectation,
+                   np.random.uniform(0, np.pi, size=layers * 2),
+                   method='COBYLA',
+                   options={'maxiter': 1000})
+    print('\nTraining Done! The output of optimizer: ')
+    print(res)
+    solution = res.x
+else:
+    optimizer = COBYLA(maxiter=1000, tol=0.0001)
+    res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
+    solution = res[0]
 print("\nTraining done! Total elapsed time:{:.2f}s".format(time.time()-start))
 
 # 打印结果
-# solution = res.x
+#
 
-print("Output Error (Manhattan Distance):", res[1])
-print("Parameters Found:", res[0])
+# print("Output Error (Manhattan Distance):", res[1])
+# print("Parameters Found:", res[0])
 
-print_result(qc, Pauli_sum.to_matrix(), para_list, solution=res[0])
+print_result(qc, Pauli_sum.to_matrix(), para_list, solution)
