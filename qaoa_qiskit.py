@@ -1,8 +1,10 @@
+import time
+
 from qiskit import QuantumCircuit, transpile
 from qiskit import Aer
+from qiskit.algorithms.optimizers import COBYLA
 from qiskit.circuit import Parameter
 from qiskit.providers.aer import StatevectorSimulator
-
 from portfolio_optimization import data_preprocessing
 import numpy as np
 from qiskit.opflow import PauliSumOp
@@ -133,8 +135,14 @@ def get_expectation(circuit, para_list, Hamiltonian):
 
     return execute_circ
 
+def str_to_statevector(string):
+    string = string[::-1]
+    dec = int(string, 2)
+    state = np.zeros(2 ** len(string))
+    state[dec] = 1.0
+    return state[None,:]
 
-def print_result(circuit, para_list, solution):
+def print_result(circuit, Hamiltonian, para_list, solution):
     qc = QuantumCircuit(num_qubits)
 
     p = len(solution) // 2
@@ -151,27 +159,45 @@ def print_result(circuit, para_list, solution):
     result = simulator.run(circ).result()
     statevector = result.get_statevector(circ)  # innner product of statevector_dagger and statevector is 1
     statevector = statevector.to_dict()
+    a = 0
+    for i in statevector:
+        statevector[i] = np.abs(np.array(statevector[i])) ** 2
+        a = a + statevector[i]
+    print('a: %f' % a)
+    print(statevector)
     result = sorted(statevector.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)
+    # print(result)
+    mm = []
+    for i in range(len(result)):
+        x, _ = result[i]
+        mm.append(str_to_statevector(x))
+    mm = np.concatenate(mm, axis=0)
+    value_mm = np.sum((mm @ Hamiltonian) * mm, axis=1)
+
+    min_index = np.argmin(value_mm)
+    print("\nOptimal: selection {}, value {:.8f}".format(result[min_index][0], value_mm[min_index]))
+
     print("\n----------------- Full result ---------------------")
     print("rank\tselection\tvalue\t\tprobability")
     print("---------------------------------------------------")
     for i in range(len(result)):
-        x, amplitude = result[i]
-        value = 0.0
+        x, probability = result[i]
+        value = value_mm[i]
+        assert np.imag(value) < 1e-10
+        value = np.real(value)
         # value = portfolio.to_quadratic_program().objective.evaluate(x)
-        probability = np.abs(amplitude) ** 2
-        print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x[::-1], value, probability))
+        print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x, value, probability))
 
 
 # 初始化参数
-theta1 = 1
-theta2 = 2.5
-theta3 = 1
 budget = 3
+Gf = 1.0 / budget
+theta1 = Gf
+theta2 = 2.5 * Gf * Gf
+theta3 = 1
 num_assets = 6
 num_slices = 1  # The number of binary bits required to represent one asset (g in the paper)
-Gf = 1.0 / 3
-layers = 10
+layers = 2
 
 num_qubits = num_assets * num_slices
 
@@ -208,18 +234,27 @@ qc.append(insert_H(), [i for i in range(0, num_qubits)])
 for i in range(layers):
     qc.append(oneCircuit(h, J, beta[i], gamma[i]), [i for i in range(0, num_qubits)])
 qc.save_statevector()
-print('\nCircuit Initialization Complete! Start Training...')
+print('Circuit Initialization Complete! Start Training...')
 
 # 计算loss
 expectation = get_expectation(qc, para_list, Pauli_sum.to_matrix())
 
 # 优化参数
-res = minimize(expectation,
-               np.ones(layers * 2),
-               method='COBYLA')
-print('\nTraining Done! The output of optimizer: ')
-print(res)
+start = time.time()
+# res = minimize(expectation,
+#                np.ones(layers * 2),
+#                method='COBYLA')
+# print('\nTraining Done! The output of optimizer: ')
+# print(res)
+
+optimizer = COBYLA(maxiter=1000, tol=0.0001)
+res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
+print("\nTraining done! Total elapsed time:{:.2f}s".format(time.time()-start))
 
 # 打印结果
-solution = res.x
-print_result(qc, para_list, solution)
+# solution = res.x
+
+print("Output Error (Manhattan Distance):", res[1])
+print("Parameters Found:", res[0])
+
+print_result(qc, Pauli_sum.to_matrix(), para_list, solution=res[0])

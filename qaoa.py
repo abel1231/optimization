@@ -135,15 +135,15 @@ def print_result(result, shoots):
 if __name__ == '__main__':
     # 初始化参数
     parser = argparse.ArgumentParser()
-    parser.add_argument('--budget', type=int, default=5, help='Total assets.')
+    parser.add_argument('--budget', type=int, default=3, help='Total assets.')
     parser.add_argument('--num_assets', type=int, default=6, help='The number of assets.')
-    parser.add_argument('--g', type=int, default=2, help='The number of binary bits required to represent one asset.')
+    parser.add_argument('--g', type=int, default=1, help='The number of binary bits required to represent one asset.')
     parser.add_argument('--theta1', type=float, default=1.0, help='Coefficient of the linear term.')
     parser.add_argument('--theta2', type=float, default=2.5, help='Coefficient of the quadratic term.')
     parser.add_argument('--theta3', type=float, default=1.0, help='Coefficient of the Lagrangian term.')
     parser.add_argument('--Gf', type=float, default=1.0, help='Granularity.')
-    parser.add_argument('--layers', type=float, default=2, help='The number of QAOA layers.')
-    parser.add_argument('--epochs', type=int, default=200, help='Number of epochs to train.')
+    parser.add_argument('--layers', type=float, default=1, help='The number of QAOA layers.')
+    parser.add_argument('--epochs', type=int, default=1, help='Number of epochs to train.')
     parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
     parser.add_argument('--momentum', type=float, default=0.9, help='Initial momentum of SGD.')
     parser.add_argument('--visual', action='store_true', default=False, help='Print the Pauli Operator of the problem.')
@@ -238,5 +238,6 @@ if __name__ == '__main__':
 
     shoots = int(1e6)  # measure次数
     result = quick_measure(qlist, shoots)
+    print(result)
     result_sorted = sorted(result.items(), key = lambda kv:(kv[1], kv[0]), reverse=True)
     print_result(result_sorted, shoots)
