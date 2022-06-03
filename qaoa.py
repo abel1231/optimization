@@ -132,6 +132,11 @@ def print_result(result, shoots):
         probability = freq / shoots
         print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x, value, probability))
 
+def stepLR(lr, cur_epoch, step_size, decay=0.99):
+    if cur_epoch % step_size == 0:
+        lr = lr * 0.99
+    return lr
+
 if __name__ == '__main__':
     # 初始化参数
     parser = argparse.ArgumentParser()

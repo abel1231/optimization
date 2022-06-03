@@ -1,8 +1,8 @@
+import argparse
 import time
-
 from qiskit import QuantumCircuit, transpile
 from qiskit import Aer
-from qiskit.algorithms.optimizers import COBYLA
+from qiskit.algorithms.optimizers import ADAM
 from qiskit.circuit import Parameter
 from qiskit.providers.aer import StatevectorSimulator
 from portfolio_optimization import data_preprocessing
@@ -142,6 +142,10 @@ def str_to_statevector(string):
     state[dec] = 1.0
     return state[None,:]
 
+def print_config():
+    print('#################### Configuration ####################')
+    print('budget: %d, g: %d, theta3: %f, layers: %d' % (budget, num_slices, theta3, layers))
+
 def print_result(circuit, Hamiltonian, para_list, solution):
     qc = QuantumCircuit(num_qubits)
 
@@ -189,77 +193,98 @@ def print_result(circuit, Hamiltonian, para_list, solution):
         print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x[::-1], value, probability))
 
 
-# 初始化参数
-budget = 3
-Gf = 1.0 / budget
-theta1 = Gf
-theta2 = 2.5 * Gf * Gf
-theta3 = 1
-num_assets = 6
-num_slices = 1  # The number of binary bits required to represent one asset (g in the paper)
-layers = 6
+if __name__ == '__main__':
+    # 初始化参数
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--budget', type=int, default=3, help='Total assets.')
+    parser.add_argument('--num_assets', type=int, default=6, help='The number of assets.')
+    parser.add_argument('--g', type=int, default=1, help='The number of binary bits required to represent one asset.')
+    parser.add_argument('--theta1', type=float, default=1.0, help='Coefficient of the linear term.')
+    parser.add_argument('--theta2', type=float, default=2.5, help='Coefficient of the quadratic term.')
+    parser.add_argument('--theta3', type=float, default=1.0, help='Coefficient of the Lagrangian term.')
+    parser.add_argument('--seed', type=int, default=123456, help='Randon seed.')
+    parser.add_argument('--optimizer', action='store_true', default=False, help='use scipy optimizer.')
+    parser.add_argument('--maxiter', type=int, default=50000, help='max iterations.')
+    parser.add_argument('--Gf', type=float, default=1.0, help='Granularity.')
+    parser.add_argument('--layers', type=int, default=1, help='The number of QAOA layers.')
+    parser.add_argument('--epochs', type=int, default=1, help='Number of epochs to train.')
+    args = parser.parse_args()
 
-num_qubits = num_assets * num_slices
+    # 初始化参数
+    budget = args.budget
+    Gf = 1.0 / budget
+    theta1 = Gf
+    theta2 = 2.5 * Gf * Gf
+    theta3 = args.theta3
+    num_assets = args.num_assets
+    num_slices = args.g  # The number of binary bits required to represent one asset (g in the paper)
+    layers = args.layers
 
-np.random.seed(12345)
-# 读取收益和方差
-file_path = "./data/stock_data.xlsx"
-exp_ret, cov_mat = data_preprocessing(file_path)
-exp_ret = exp_ret.to_numpy()
-cov_mat = cov_mat.to_numpy()
+    print_config()
 
-# 计算所给问题对应的哈密尔顿量的系数
-J = calc_J()
-h = calc_h()
+    num_qubits = num_assets * num_slices
 
-# 计算所给问题对应的哈密尔顿量
-Pauli_h, Pauli_J, Pauli_sum = problem_PauliOperator(h, J)
+    np.random.seed(args.seed)
+    # 读取收益和方差
+    file_path = "./data/stock_data.xlsx"
+    exp_ret, cov_mat = data_preprocessing(file_path)
+    exp_ret = exp_ret.to_numpy()
+    cov_mat = cov_mat.to_numpy()
 
-# 初始化量子虚拟机, 分配量子比特
-simulator = Aer.get_backend('aer_simulator')
-qc = QuantumCircuit(num_qubits)
+    # 计算所给问题对应的哈密尔顿量的系数
+    J = calc_J()
+    h = calc_h()
 
-# 配置待优化参数
-beta = []
-gamma = []
-para_list = []
-for i in range(layers):
-    name = "β%d" % i
-    beta.append(Parameter(name))
-    name = "γ%d" % i
-    gamma.append(Parameter(name))
-para_list = beta + gamma
+    # 计算所给问题对应的哈密尔顿量
+    Pauli_h, Pauli_J, Pauli_sum = problem_PauliOperator(h, J)
 
-# 构建QAOA
-qc.append(insert_H(), [i for i in range(0, num_qubits)])
-for i in range(layers):
-    qc.append(oneCircuit(h, J, beta[i], gamma[i]), [i for i in range(0, num_qubits)])
-qc.save_statevector()
-print('Circuit Initialization Complete! Start Training...')
+    # 初始化量子虚拟机, 分配量子比特
+    simulator = Aer.get_backend('aer_simulator')
+    qc = QuantumCircuit(num_qubits)
 
-# 计算loss
-expectation = get_expectation(qc, para_list, Pauli_sum.to_matrix())
+    # 配置待优化参数
+    beta = []
+    gamma = []
+    para_list = []
+    for i in range(layers):
+        name = "β%d" % i
+        beta.append(Parameter(name))
+        name = "γ%d" % i
+        gamma.append(Parameter(name))
+    para_list = beta + gamma
 
-# 优化参数
-start = time.time()
-if 1:
-    res = minimize(expectation,
-                   np.random.uniform(0, np.pi, size=layers * 2),
-                   method='COBYLA',
-                   options={'maxiter': 1000})
-    print('\nTraining Done! The output of optimizer: ')
-    print(res)
-    solution = res.x
-else:
-    optimizer = COBYLA(maxiter=1000, tol=0.0001)
-    res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
-    solution = res[0]
-print("\nTraining done! Total elapsed time:{:.2f}s".format(time.time()-start))
+    # 构建QAOA
+    qc.append(insert_H(), [i for i in range(0, num_qubits)])
+    for i in range(layers):
+        qc.append(oneCircuit(h, J, beta[i], gamma[i]), [i for i in range(0, num_qubits)])
+    qc.save_statevector()
+    print('\nCircuit Initialization Complete! Start Training...')
 
-# 打印结果
-#
+    # 计算loss
+    expectation = get_expectation(qc, para_list, Pauli_sum.to_matrix())
 
-# print("Output Error (Manhattan Distance):", res[1])
-# print("Parameters Found:", res[0])
+    # 优化参数
+    start = time.time()
+    if args.optimizer:
+        res = minimize(expectation,
+                       np.random.uniform(0, np.pi, size=layers * 2),
+                       method='COBYLA',
+                       options={'maxiter': args.maxiter})
+        print('\nTraining Done! The output of optimizer: ')
+        print(res)
+        solution = res.x
+    else:
+        # optimizer = COBYLA(maxiter=args.maxiter, tol=0.0001)
+        optimizer = ADAM(maxiter=8000, lr=0.001, amsgrad=True)
+        res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
+        solution = res[0]
+        print("Parameters Found:", res[0])
+    print("\nTraining done! Total elapsed time:{:.2f}s".format(time.time()-start))
 
-print_result(qc, Pauli_sum.to_matrix(), para_list, solution)
+    # 打印结果
+    #
+
+    # print("Output Error (Manhattan Distance):", res[1])
+    # print("Parameters Found:", res[0])
+
+    print_result(qc, Pauli_sum.to_matrix(), para_list, solution)
