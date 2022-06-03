@@ -2,7 +2,7 @@ import argparse
 import time
 from qiskit import QuantumCircuit, transpile
 from qiskit import Aer
-from qiskit.algorithms.optimizers import ADAM
+from qiskit.algorithms.optimizers import SPSA, COBYLA, ADAM, AQGD
 from qiskit.circuit import Parameter
 from qiskit.providers.aer import StatevectorSimulator
 from portfolio_optimization import data_preprocessing
@@ -127,9 +127,10 @@ def get_expectation(circuit, para_list, Hamiltonian):
         circ = transpile(qc, simulator)
         result = simulator.run(circ).result()
         _statevector = result.get_statevector(circ)  # innner product of statevector_dagger and statevector is 1
-        statevector = np.array(_statevector)
-        statevector_dagger = np.array(_statevector.conjugate())
-        loss =  statevector_dagger @ Hamiltonian @ statevector
+        # statevector = np.array(_statevector)
+        # statevector_dagger = np.array(_statevector.conjugate())
+        # loss =  statevector_dagger @ Hamiltonian @ statevector
+        loss = _statevector.expectation_value(Hamiltonian)
         assert np.imag(loss) < 1e-10
         return np.real(loss)
 
@@ -143,7 +144,7 @@ def str_to_statevector(string):
     return state[None,:]
 
 def print_config():
-    print('#################### Configuration ####################')
+    print('%%%%%%%%%%%%%%%%%%%% Configuration %%%%%%%%%%%%%%%%%%%%')
     print('budget: %d, g: %d, theta3: %f, layers: %d' % (budget, num_slices, theta3, layers))
 
 def print_result(circuit, Hamiltonian, para_list, solution):
@@ -192,6 +193,35 @@ def print_result(circuit, Hamiltonian, para_list, solution):
         # value = portfolio.to_quadratic_program().objective.evaluate(x)
         print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x[::-1], value, probability))
 
+class callback:
+    def __init__(self, step_size: int):
+        self.step_size = step_size
+        self.full_values = []
+        self._values = []
+        self.values = []
+
+    def __call__(self, nfev, parameters, value, stepsize, accepted):
+        self.full_values.append(value)
+        self._values.append(value)
+        if len(self._values) == self.step_size:
+            last_value = self._values[-1]
+            self.values.append(last_value)
+            self._values = []
+            return self.values
+
+def print_loss(res):
+    print('%%%%%%%%%%%%%%%%%%%% Optimization Output %%%%%%%%%%%%%%%%%%%%')
+    loss_ls = callback_func.values
+    print('minimal loss: %s, \nmaxIter: %d' % (res[1], len(callback_func.full_values)))
+    print("Parameters Found:", res[0])
+    print("\n----------------- Loss (%d steps from %d iterations) -----------------" % (len(loss_ls), len(callback_func.full_values)))
+    print("iter\t\tloss")
+    print("------------------------------------------------------------------------")
+    for i in range(len(loss_ls)):
+        loss = loss_ls[i]
+        # value = portfolio.to_quadratic_program().objective.evaluate(x)
+        print("%d\t\t%.10f" % (i, loss))
+
 
 if __name__ == '__main__':
     # 初始化参数
@@ -206,7 +236,8 @@ if __name__ == '__main__':
     parser.add_argument('--optimizer', action='store_true', default=False, help='use scipy optimizer.')
     parser.add_argument('--maxiter', type=int, default=50000, help='max iterations.')
     parser.add_argument('--Gf', type=float, default=1.0, help='Granularity.')
-    parser.add_argument('--layers', type=int, default=1, help='The number of QAOA layers.')
+    parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
+    parser.add_argument('--layers', type=int, default=3, help='The number of QAOA layers.')
     parser.add_argument('--epochs', type=int, default=1, help='Number of epochs to train.')
     args = parser.parse_args()
 
@@ -261,11 +292,12 @@ if __name__ == '__main__':
     print('\nCircuit Initialization Complete! Start Training...')
 
     # 计算loss
-    expectation = get_expectation(qc, para_list, Pauli_sum.to_matrix())
+    expectation = get_expectation(qc, para_list, Pauli_sum)
 
     # 优化参数
     start = time.time()
     if args.optimizer:
+        # 利用外部优化器
         res = minimize(expectation,
                        np.random.uniform(0, np.pi, size=layers * 2),
                        method='COBYLA',
@@ -274,17 +306,18 @@ if __name__ == '__main__':
         print(res)
         solution = res.x
     else:
+        # 利用qiskit自带优化器
         # optimizer = COBYLA(maxiter=args.maxiter, tol=0.0001)
-        optimizer = ADAM(maxiter=8000, lr=0.001, amsgrad=True)
+        # res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
+        step_size = 1 # 每隔step_size个iterations打印一次loss
+        callback_func = callback(step_size)
+        optimizer = SPSA(maxiter=100, blocking=True, second_order=False, callback=callback_func)
         res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
         solution = res[0]
-        print("Parameters Found:", res[0])
+        # 打印loss的变化
+        print_loss(res)
+
     print("\nTraining done! Total elapsed time:{:.2f}s".format(time.time()-start))
 
     # 打印结果
-    #
-
-    # print("Output Error (Manhattan Distance):", res[1])
-    # print("Parameters Found:", res[0])
-
     print_result(qc, Pauli_sum.to_matrix(), para_list, solution)
