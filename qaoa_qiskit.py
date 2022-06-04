@@ -212,7 +212,7 @@ class callback:
 def print_loss(res):
     print('%%%%%%%%%%%%%%%%%%%% Optimization Output %%%%%%%%%%%%%%%%%%%%')
     loss_ls = callback_func.values
-    print('minimal loss: %s, \nmaxIter: %d' % (res[1], len(callback_func.full_values)))
+    print('minimal loss: %s, \nmaxIter: %d, func_eval: %d' % (res[1], len(callback_func.full_values), res[2]))
     print("Parameters Found:", res[0])
     print("\n----------------- Loss (%d steps from %d iterations) -----------------" % (len(loss_ls), len(callback_func.full_values)))
     print("iter\t\tloss")
@@ -311,7 +311,7 @@ if __name__ == '__main__':
         # res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
         step_size = 1 # 每隔step_size个iterations打印一次loss
         callback_func = callback(step_size)
-        optimizer = SPSA(maxiter=100, blocking=True, second_order=False, callback=callback_func)
+        optimizer = SPSA(maxiter=200, blocking=True, second_order=False, callback=callback_func)
         res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
         solution = res[0]
         # 打印loss的变化
