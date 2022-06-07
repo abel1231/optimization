@@ -182,16 +182,22 @@ def print_result(circuit, Hamiltonian, para_list, solution):
     min_index = np.argmin(value_mm)
     print("\nOptimal: selection {}, value {:.8f}".format(result[min_index][0][::-1], value_mm[min_index]))
 
-    print("\n----------------- Full result ---------------------")
+    print("\n----------------- Full result ---------------------", flush=True)
     print("rank\tselection\tvalue\t\tprobability")
-    print("---------------------------------------------------")
+    print("---------------------------------------------------", flush=True)
+    value_save = []
+    probability_save = []
+    utility_save = []
     for i in range(len(result)):
         x, probability = result[i]
         value = value_mm[i]
         assert np.imag(value) < 1e-10
         value = np.real(value)
         # value = portfolio.to_quadratic_program().objective.evaluate(x)
-        print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x[::-1], value, probability))
+        print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x[::-1], value, probability), flush=True)
+        ## do not save the optimal selection
+        np.savez("./output/budget_{}/layers_{}/theta3_{}.npz".format(budget, layers, theta3), value=np.array(value_save), \
+        probability=np.array(probability_save), utility=np.array(utility_save))
 
 class callback:
     def __init__(self, step_size: int):
