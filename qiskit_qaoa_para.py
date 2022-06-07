@@ -231,7 +231,7 @@ def print_result(circuit, Hamiltonian, para_list, solution):
         
         print("%d\t%-10s\t%.8f\t%.8f\t%s\t%d\t%.8f" % (i, x[::-1], value, utility, flag, w_sum, probability), flush=True)
         
-        np.savez("./output/budget_{}/layers_{}/theta3_{}.npz".format(budget, layers, theta3), value=np.array(value_save), \
+        np.savez("./output/budget_{}_layers_{}_theta3_{}.npz".format(budget, layers, theta3), value=np.array(value_save), \
         probability=np.array(probability_save), utility=np.array(utility_save))
 
 
