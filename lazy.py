@@ -57,10 +57,10 @@ def problem_PauliOperator(h, J):
     return PauliOperator(problem)
 
 def oneCircuit(qlist, Hamiltonian, beta, gamma):
-    vqc=VariationalQuantumCircuit()
+    vqc = QCircuit()
 
     for j in qlist:
-        vqc.insert(VariationalQuantumGate_RX(j,2.0*beta))
+        vqc.insert(RX(j,2.0*beta))
 
     z_dict = []
     zz_dict = []
@@ -93,7 +93,7 @@ def oneCircuit(qlist, Hamiltonian, beta, gamma):
         coef = item[1]
 
         if 1 == len(tmp_vec):
-            vqc.insert(VariationalQuantumGate_RZ(tmp_vec[0], 2 * coef * gamma))
+            vqc.insert(RZ(tmp_vec[0], 2 * coef * gamma))
         else:
             raise AssertionError()
 
@@ -109,9 +109,9 @@ def oneCircuit(qlist, Hamiltonian, beta, gamma):
         coef = item[1]
 
         if 2 == len(tmp_vec):
-            vqc.insert(VariationalQuantumGate_CNOT(tmp_vec[0], tmp_vec[1]))
-            vqc.insert(VariationalQuantumGate_RZ(tmp_vec[1], 2 * gamma * coef))
-            vqc.insert(VariationalQuantumGate_CNOT(tmp_vec[0], tmp_vec[1]))
+            vqc.insert(CNOT(tmp_vec[0], tmp_vec[1]))
+            vqc.insert(RZ(tmp_vec[1], 2 * gamma * coef))
+            vqc.insert(CNOT(tmp_vec[0], tmp_vec[1]))
         else:
             raise AssertionError()
 
@@ -186,11 +186,11 @@ def get_expectation(Hamiltonian, Hamiltonian_matrix, train=True):
         # beta = var(_beta.reshape(-1,1))
         # gamma = var(_gamma.reshape(-1,1))
 
-        vqc = VariationalQuantumCircuit()
+        vqc = QCircuit()
 
         # 初始哈密尔顿量
         for i in qlist:
-            vqc.insert(VariationalQuantumGate_H(i))
+            vqc.insert(H(i))
 
         # 插入给定层数的QAOA layer
         if layers == 1:
@@ -200,9 +200,8 @@ def get_expectation(Hamiltonian, Hamiltonian_matrix, train=True):
                 vqc.insert(oneCircuit(qlist, Hamiltonian, beta[layer], gamma[layer]))
 
         # 构建量子线路实例
-        circuit = vqc.feed()
         prog = QProg()
-        prog.insert(circuit)
+        prog.insert(vqc)
 
         if train:
             # 输出每个selection对应的probability, 例如: result = {'00': 0.5, '01': 0.0, '10': 0.5, '11': 0.0}
@@ -293,13 +292,12 @@ if __name__ == '__main__':
     parser.add_argument('--Gf', type=float, default=1.0, help='Granularity.')
     parser.add_argument('--optimizer', action='store_true', default=False, help='use scipy optimizer.')
     parser.add_argument('--maxiter', type=int, default=300, help='max iterations.')
-    parser.add_argument('--layers', type=float, default=6, help='The number of QAOA layers.')
+    parser.add_argument('--layers', type=float, default=3, help='The number of QAOA layers.')
     parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
     parser.add_argument('--visual', action='store_true', default=False, help='Print the Pauli Operator of the problem.')
     parser.add_argument('--data_path', type=str, default="./data/stock_data.xlsx", help='The path where the original data is stored.')
     args = parser.parse_args()
 
-    # 初始化参数
     budget = args.budget
     Gf = 1.0 / budget
     theta1 = Gf
@@ -308,6 +306,8 @@ if __name__ == '__main__':
     num_assets = args.num_assets
     num_slices = args.g  # The number of binary bits required to represent one asset (g in the paper)
     layers = args.layers
+    maxiter = args.maxiter
+    optimizer = args.optimizer
 
     print_config()
 
@@ -336,17 +336,17 @@ if __name__ == '__main__':
     if args.visual:
         print(Hp)
 
-    print('\nCircuit Initialization Complete! Start Training...')
+    # print('\nCircuit Initialization Complete! Start Training...')
 
     # 计算loss
     expectation = get_expectation(Hp.toHamiltonian(1), Hamiltonian_matrix)
 
     # 优化参数
     start = time.time()
-    if args.optimizer:
+    if optimizer:
         # 利用外部优化器
         res = minimize(expectation,
-                       np.random.uniform(0, np.pi, size=layers * 2),
+                       np.random.uniform(-0.1, 0.1, size=layers * 2),
                        method='COBYLA',
                        options={'maxiter': args.maxiter})
         print('\nTraining Done! The output of optimizer: ')
@@ -358,9 +358,9 @@ if __name__ == '__main__':
         # res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
         step_size = 1  # 每隔step_size个iterations打印一次loss
         callback_func = callback(step_size)
-        optimizer = SPSA(maxiter=args.maxiter, blocking=True, second_order=True, callback=callback_func)
+        optimizer = SPSA(maxiter=maxiter, blocking=True, second_order=True, callback=callback_func)
         res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation,
-                                 initial_point=np.random.uniform(0.1, 0.1, size=layers * 2))
+                                 initial_point=np.random.uniform(-0.1, 0.1, size=layers * 2))
         solution = res[0]
         # 打印loss的变化
         print_loss(res)
