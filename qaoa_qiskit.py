@@ -240,7 +240,7 @@ if __name__ == '__main__':
     parser.add_argument('--theta3', type=float, default=1.0, help='Coefficient of the Lagrangian term.')
     parser.add_argument('--seed', type=int, default=123456, help='Randon seed.')
     parser.add_argument('--optimizer', action='store_true', default=False, help='use scipy optimizer.')
-    parser.add_argument('--maxiter', type=int, default=50000, help='max iterations.')
+    parser.add_argument('--maxiter', type=int, default=300, help='max iterations.')
     parser.add_argument('--Gf', type=float, default=1.0, help='Granularity.')
     parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
     parser.add_argument('--layers', type=int, default=3, help='The number of QAOA layers.')
@@ -317,7 +317,7 @@ if __name__ == '__main__':
         # res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
         step_size = 1 # 每隔step_size个iterations打印一次loss
         callback_func = callback(step_size)
-        optimizer = SPSA(maxiter=200, blocking=True, second_order=False, callback=callback_func)
+        optimizer = SPSA(maxiter=args.maxiter, blocking=True, second_order=True, callback=callback_func)
         res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
         solution = res[0]
         # 打印loss的变化

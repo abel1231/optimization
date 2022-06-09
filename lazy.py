@@ -6,6 +6,7 @@ import argparse
 from qiskit.algorithms.optimizers import SPSA, COBYLA, ADAM, AQGD
 from qiskit.opflow import PauliSumOp
 from scipy.optimize import minimize
+from qiskit.utils import algorithm_globals
 
 def calc_J():
     '''
@@ -291,9 +292,10 @@ if __name__ == '__main__':
     parser.add_argument('--theta3', type=float, default=1.0, help='Coefficient of the Lagrangian term.')
     parser.add_argument('--Gf', type=float, default=1.0, help='Granularity.')
     parser.add_argument('--optimizer', action='store_true', default=False, help='use scipy optimizer.')
-    parser.add_argument('--maxiter', type=int, default=300, help='max iterations.')
-    parser.add_argument('--layers', type=float, default=3, help='The number of QAOA layers.')
+    parser.add_argument('--maxiter', type=int, default=5000, help='max iterations.')
+    parser.add_argument('--layers', type=float, default=6, help='The number of QAOA layers.')
     parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
+    parser.add_argument('--seed', type=int, default=1234, help='Randon seed.')
     parser.add_argument('--visual', action='store_true', default=False, help='Print the Pauli Operator of the problem.')
     parser.add_argument('--data_path', type=str, default="./data/stock_data.xlsx", help='The path where the original data is stored.')
     args = parser.parse_args()
@@ -310,6 +312,10 @@ if __name__ == '__main__':
     optimizer = args.optimizer
 
     print_config()
+
+    # set random seed
+    algorithm_globals.random_seed = args.seed
+    np.random.seed(args.seed)
 
     # 读取收益和方差
     file_path = args.data_path
@@ -358,7 +364,7 @@ if __name__ == '__main__':
         # res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
         step_size = 1  # 每隔step_size个iterations打印一次loss
         callback_func = callback(step_size)
-        optimizer = SPSA(maxiter=maxiter, blocking=True, second_order=True, callback=callback_func)
+        optimizer = COBYLA(maxiter=maxiter)
         res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation,
                                  initial_point=np.random.uniform(-0.1, 0.1, size=layers * 2))
         solution = res[0]
