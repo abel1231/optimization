@@ -64,4 +64,4 @@ or [Qiskit Optimizers](https://qiskit.org/documentation/stubs/qiskit.algorithms.
 In order to generate the figures that characterize the probability distribution of the final quantum state relative to the Hamiltonian, 
 we provide `plot_result.py`. For example, 
 
-    python plot_result.py --num_diaplay 5 --offset 0.0001 --path b2_g1_ly8.out --save_type svg
+    python plot_result.py --num_diaplay 5 --offset 0.0001 --path ./out/b2_g1_ly8.out
