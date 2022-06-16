@@ -37,6 +37,10 @@ If all goes well, all dependencies will be installed successfully.
 
 ## Examples of how to use the code
 
+To obtain the optimal solution of the quadratic optimization problem produced by the classical optimization method, run
+
+    python portfolio_optimization.py
+
 To train an 8-layer QAOA model under the setting of 4 budget, 6 assets, 2 bits for representing one asset, 
 and we set the maximum number of optimization iterations to 2000, run the code
 
