@@ -8,8 +8,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--num_display', type=int, default=5)
 parser.add_argument('--offset', type=float, default=0.0003)
 parser.add_argument('--path', type=str, default='./out/b2_g1_ly8.out')
-parser.add_argument('--save_path', type=str, default='./out')
-parser.add_argument('--save_type', type=str, default='eps')
+parser.add_argument('--save_path', type=str, default='./outt')
+parser.add_argument('--save_type', type=str, default='svg')
 args = parser.parse_args()
 
 path = args.path
@@ -89,4 +89,4 @@ filename = os.path.join(args.save_path, filename)
 print(filename)
 plt.savefig(filename, format=save_type)
 
-plt.show()
+# plt.show()

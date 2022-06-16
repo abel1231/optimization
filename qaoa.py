@@ -3,6 +3,10 @@ from pyqpanda import *
 import numpy as np
 from portfolio_optimization import data_preprocessing
 import argparse
+from qiskit.algorithms.optimizers import SPSA, COBYLA, ADAM, AQGD
+from qiskit.opflow import PauliSumOp
+from scipy.optimize import minimize
+from qiskit.utils import algorithm_globals
 
 def calc_J():
     '''
@@ -54,10 +58,10 @@ def problem_PauliOperator(h, J):
     return PauliOperator(problem)
 
 def oneCircuit(qlist, Hamiltonian, beta, gamma):
-    vqc=VariationalQuantumCircuit()
+    vqc = QCircuit()
 
     for j in qlist:
-        vqc.insert(VariationalQuantumGate_RX(j,2.0*beta))
+        vqc.insert(RX(j,2.0*beta))
 
     z_dict = []
     zz_dict = []
@@ -90,7 +94,7 @@ def oneCircuit(qlist, Hamiltonian, beta, gamma):
         coef = item[1]
 
         if 1 == len(tmp_vec):
-            vqc.insert(VariationalQuantumGate_RZ(tmp_vec[0], 2 * coef * gamma))
+            vqc.insert(RZ(tmp_vec[0], 2 * coef * gamma))
         else:
             raise AssertionError()
 
@@ -106,9 +110,9 @@ def oneCircuit(qlist, Hamiltonian, beta, gamma):
         coef = item[1]
 
         if 2 == len(tmp_vec):
-            vqc.insert(VariationalQuantumGate_CNOT(tmp_vec[0], tmp_vec[1]))
-            vqc.insert(VariationalQuantumGate_RZ(tmp_vec[1], 2 * gamma * coef))
-            vqc.insert(VariationalQuantumGate_CNOT(tmp_vec[0], tmp_vec[1]))
+            vqc.insert(CNOT(tmp_vec[0], tmp_vec[1]))
+            vqc.insert(RZ(tmp_vec[1], 2 * gamma * coef))
+            vqc.insert(CNOT(tmp_vec[0], tmp_vec[1]))
         else:
             raise AssertionError()
 
@@ -121,21 +125,161 @@ def test_coef(J, h):
     print(J == J_true)
     print(h == h_true)
 
-def print_result(result, shoots):
-    print("\n----------------- Full result ---------------------")
-    print("rank\tselection\tvalue\t\tprobability")
-    print("---------------------------------------------------")
-    for i in range(len(result)):
-        x, freq = result[i]
-        value = 0.0
-        # value = portfolio.to_quadratic_program().objective.evaluate(x)
-        probability = freq / shoots
-        print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x, value, probability))
-
 def stepLR(lr, cur_epoch, step_size, decay=0.99):
     if cur_epoch % step_size == 0:
         lr = lr * 0.99
     return lr
+
+def get_Pauli(index, type):
+    if type == 'Z':
+        assert len(index) == 1
+        index = index[0]
+        assert index >= 0 and index <= num_qubits - 1
+        _Pauli = ['I'] * (num_qubits - 1)
+        _Pauli.insert(index, 'Z')
+        _Pauli = ''.join(_Pauli)
+        return _Pauli
+    elif type == 'ZZ':
+        assert len(index) == 2
+        _Pauli = ['I'] * (num_qubits - 2)
+        for i in range(len(index)):
+            assert index[i] >= 0 and index[i] <= num_qubits - 1
+            _Pauli.insert(index[i], 'Z')
+        _Pauli = ''.join(_Pauli)
+        return _Pauli
+    else:
+        raise AssertionError()
+
+def qiskit_problem_PauliOperator(h, J):
+    Pauli_h_list = []
+    for i in range(num_qubits):
+        Pauli_h_list.append((get_Pauli([i], 'Z'), h[i]))
+    Pauli_h = PauliSumOp.from_list(Pauli_h_list, coeff=1.0)
+
+    Pauli_J_list = []
+    for i in range(num_qubits):
+        for j in range(i + 1, num_qubits):
+            Pauli_J_list.append((get_Pauli([i,j], 'ZZ'), J[i][j]))
+    Pauli_J = PauliSumOp.from_list(Pauli_J_list, coeff=1.0)
+
+    Pauli_sum = Pauli_h + Pauli_J
+
+    return Pauli_h, Pauli_J, Pauli_sum
+
+def str_to_statevector(string):
+    string = string[::-1]
+    dec = int(string, 2)
+    state = np.zeros(2 ** len(string))
+    state[dec] = 1.0
+    return state[None,:]
+
+def print_config():
+    print('%%%%%%%%%%%%%%%%%%%% Configuration %%%%%%%%%%%%%%%%%%%%')
+    print('budget: %d, g: %d, theta3: %f, layers: %d' % (budget, num_slices, theta3, layers))
+
+def get_expectation(Hamiltonian, Hamiltonian_matrix, train=True):
+
+    def execute_circ(theta):
+        p = len(theta) // 2
+        beta = theta[:p]
+        gamma = theta[p:]
+
+        # beta = var(_beta.reshape(-1,1))
+        # gamma = var(_gamma.reshape(-1,1))
+
+        vqc = QCircuit()
+
+        # 初始哈密尔顿量
+        for i in qlist:
+            vqc.insert(H(i))
+
+        # 插入给定层数的QAOA layer
+        if layers == 1:
+            vqc.insert(oneCircuit(qlist, Hamiltonian, beta[0], gamma[0]))
+        else:
+            for layer in range(layers):
+                vqc.insert(oneCircuit(qlist, Hamiltonian, beta[layer], gamma[layer]))
+
+        # 构建量子线路实例
+        prog = QProg()
+        prog.insert(vqc)
+
+        if train:
+            # 输出每个selection对应的probability, 例如: result = {'00': 0.5, '01': 0.0, '10': 0.5, '11': 0.0}
+            result = prob_run_list(prog, qlist, -1)
+            statevector = np.sqrt(np.array(result))  # vector representation of the output state
+
+            loss = statevector @ Hamiltonian_matrix @ statevector
+            assert np.imag(loss) < 1e-10
+            return np.real(loss)
+        else:
+            result = prob_run_dict(prog, qlist, -1)
+            result_tonumpy = np.array(prob_run_list(prog, qlist, -1))
+            return result, result_tonumpy
+    return execute_circ
+
+def print_result(Hamiltonian, Hamiltonian_matrix, solution):
+    execute_circ = get_expectation(Hamiltonian, Hamiltonian_matrix, train=False)
+    result, result_tonumpy = execute_circ(solution)
+
+    result = sorted(result.items(), key=lambda kv: (kv[1], kv[0]), reverse=True)
+    mm = []
+    for i in range(len(result)):
+        x, _ = result[i]
+        mm.append(str_to_statevector(x))
+    mm = np.concatenate(mm, axis=0)
+    value_mm = np.sum((mm @ Hamiltonian_matrix) * mm, axis=1)
+
+    min_index = np.argmin(value_mm)
+
+    print("\nOptimal: selection {}, value {:.8f}".format(result[min_index][0][::-1], value_mm[min_index]))
+
+    print("\n----------------- Full result ---------------------")
+    print("rank\tselection\tvalue\t\tprobability")
+    print("---------------------------------------------------")
+    value_save = []
+    probability_save = []
+    utility_save = []
+    for i in range(len(result)):
+        x, probability = result[i]
+        value = value_mm[i]
+        assert np.imag(value) < 1e-10
+        value = np.real(value)
+        # value = portfolio.to_quadratic_program().objective.evaluate(x)
+        print("%d\t%-10s\t%.8f\t\t%.8f" % (i, x[::-1], value, probability))
+        ## do not save the optimal selection
+        # np.savez("./output/budget_{}_layers_{}_theta3_{}.npz".format(budget, layers, theta3),
+        #          value=np.array(value_save), \
+        #          probability=np.array(probability_save), utility=np.array(utility_save))
+
+class callback:
+    def __init__(self, step_size: int):
+        self.step_size = step_size
+        self.full_values = []
+        self._values = []
+        self.values = []
+
+    def __call__(self, nfev, parameters, value, stepsize, accepted):
+        self.full_values.append(value)
+        self._values.append(value)
+        if len(self._values) == self.step_size:
+            last_value = self._values[-1]
+            self.values.append(last_value)
+            self._values = []
+            return self.values
+
+def print_loss(res):
+    print('%%%%%%%%%%%%%%%%%%%% Optimization Output %%%%%%%%%%%%%%%%%%%%')
+    loss_ls = callback_func.values
+    print('minimal loss: %s, \nmaxIter: %d, func_eval: %d' % (res[1], len(callback_func.full_values), res[2]))
+    print("Parameters Found:", res[0])
+    print("\n----------------- Loss (%d steps from %d iterations) -----------------" % (len(loss_ls), len(callback_func.full_values)))
+    print("iter\t\tloss")
+    print("------------------------------------------------------------------------")
+    for i in range(len(loss_ls)):
+        loss = loss_ls[i]
+        # value = portfolio.to_quadratic_program().objective.evaluate(x)
+        print("%d\t\t%.10f" % (i, loss))
 
 if __name__ == '__main__':
     # 初始化参数
@@ -147,24 +291,31 @@ if __name__ == '__main__':
     parser.add_argument('--theta2', type=float, default=2.5, help='Coefficient of the quadratic term.')
     parser.add_argument('--theta3', type=float, default=1.0, help='Coefficient of the Lagrangian term.')
     parser.add_argument('--Gf', type=float, default=1.0, help='Granularity.')
-    parser.add_argument('--layers', type=float, default=1, help='The number of QAOA layers.')
-    parser.add_argument('--epochs', type=int, default=1, help='Number of epochs to train.')
+    parser.add_argument('--optimizer', action='store_true', default=False, help='use scipy optimizer.')
+    parser.add_argument('--maxiter', type=int, default=5000, help='max iterations.')
+    parser.add_argument('--layers', type=float, default=6, help='The number of QAOA layers.')
     parser.add_argument('--lr', type=float, default=0.01, help='Initial learning rate.')
-    parser.add_argument('--momentum', type=float, default=0.9, help='Initial momentum of SGD.')
+    parser.add_argument('--seed', type=int, default=1234, help='Randon seed.')
     parser.add_argument('--visual', action='store_true', default=False, help='Print the Pauli Operator of the problem.')
-    parser.add_argument('--patience', type=int, default=20, help='Stop training if loss does not decrease significantly within patience steps.')
     parser.add_argument('--data_path', type=str, default="./data/stock_data.xlsx", help='The path where the original data is stored.')
     args = parser.parse_args()
 
-    theta1 = args.theta1
-    theta2 = args.theta2
-    theta3 = args.theta3
     budget = args.budget
+    Gf = 1.0 / budget
+    theta1 = Gf
+    theta2 = 2.5 * Gf * Gf
+    theta3 = args.theta3
     num_assets = args.num_assets
     num_slices = args.g  # The number of binary bits required to represent one asset (g in the paper)
-    Gf = args.Gf
     layers = args.layers
-    epochs = args.epochs
+    maxiter = args.maxiter
+    optimizer = args.optimizer
+
+    print_config()
+
+    # set random seed
+    algorithm_globals.random_seed = args.seed
+    np.random.seed(args.seed)
 
     # 读取收益和方差
     file_path = args.data_path
@@ -178,71 +329,49 @@ if __name__ == '__main__':
 
     qlist = machine.qAlloc_many(num_qubits)
 
-    beta = var(np.ones((layers, 1), dtype='float64'), True)
-    gamma = var(np.ones((layers, 1), dtype='float64'), True)
-
-    vqc = VariationalQuantumCircuit()
-
-    # 初始哈密尔顿量
-    for i in qlist:
-        vqc.insert(VariationalQuantumGate_H(i))
-
     # 计算所给问题对应的哈密尔顿量的系数
     J = calc_J()
     h = calc_h()
     # test_coef(J, h)
-    # 计算所给问题对应的哈密尔顿量
+    # 计算所给问题对应的哈密尔顿量, 及其对应的矩阵
     Hp = problem_PauliOperator(h, J)
+
+    Pauli_h, Pauli_J, Pauli_sum = qiskit_problem_PauliOperator(h, J)
+    Hamiltonian_matrix = Pauli_sum.to_matrix()
     # 是否打印哈密尔顿量
     if args.visual:
         print(Hp)
-    # 插入给定层数的QAOA layer
-    if layers == 1:
-        vqc.insert(oneCircuit(qlist, Hp.toHamiltonian(1), beta, gamma))
-    else:
-        for layer in range(layers):
-            vqc.insert(oneCircuit(qlist, Hp.toHamiltonian(1), beta[layer], gamma[layer]))
 
-    print('\nCircuit Initialization Complete! Start Training...')
-    # 计算loss, 并指定优化器
-    loss = qop(vqc, Hp, machine, qlist)
-    optimizer = AdamOptimizer.minimize(loss,  # 损失函数
-                                       args.lr,  # 学习率
-                                       0.9,   # 一阶动量衰减系数
-                                       0.999, # 二阶动量衰减系数
-                                       1.e-10)# 很小的数值以避免零分母
+    # print('\nCircuit Initialization Complete! Start Training...')
 
-    leaves = optimizer.get_variables()
+    # 计算loss
+    expectation = get_expectation(Hp.toHamiltonian(1), Hamiltonian_matrix)
 
-    loss_value_his = 0
-    loss_value_min = 1e6
-    count = 0
+    # 优化参数
     start = time.time()
-    # 开始训练
-    for i in range(epochs):
-        if count > args.patience:
-            break # 当连续patience个epoch输出的loss没有太大变化, 提前停止训练
-        start_local = time.time()
-        optimizer.run(leaves, 0)
-        loss_value = optimizer.get_loss()
-        if loss_value_min > loss_value:
-            loss_value_min = loss_value
-        if np.abs(loss_value - loss_value_his) < 1e-4 or loss_value > loss_value_min:
-            count += 1
-        else:
-            count = 0
-        loss_value_his = loss_value
-        print("epoch:", i, " loss: {:.8f}".format(loss_value), " time: {:.2f}s".format(time.time() - start_local))
-    print("\nTraining done! Total elapsed time:{:.2f}s".format(time.time()-start))
+    if optimizer:
+        # 利用外部优化器
+        res = minimize(expectation,
+                       np.random.uniform(-0.1, 0.1, size=layers * 2),
+                       method='COBYLA',
+                       options={'maxiter': args.maxiter})
+        print('\nTraining Done! The output of optimizer: ')
+        print(res)
+        solution = res.x
+    else:
+        # 利用qiskit自带优化器
+        # optimizer = COBYLA(maxiter=args.maxiter, tol=0.0001)
+        # res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation, initial_point=np.random.uniform(0, np.pi, size=layers * 2))
+        step_size = 1  # 每隔step_size个iterations打印一次loss
+        callback_func = callback(step_size)
+        optimizer = COBYLA(maxiter=maxiter)
+        res = optimizer.optimize(num_vars=layers * 2, objective_function=expectation,
+                                 initial_point=np.random.uniform(-0.1, 0.1, size=layers * 2))
+        solution = res[0]
+        # 打印loss的变化
+        print_loss(res)
 
-    # 打印结果, 输出是通过measure得到的二进制字符串, 以及其出现的概率
-    prog = QProg()
-    qcir = vqc.feed()
-    prog.insert(qcir)
-    directly_run(prog)
+    print("\nTraining done! Total elapsed time:{:.2f}s".format(time.time() - start))
 
-    shoots = int(1e6)  # measure次数
-    result = quick_measure(qlist, shoots)
-    print(result)
-    result_sorted = sorted(result.items(), key = lambda kv:(kv[1], kv[0]), reverse=True)
-    print_result(result_sorted, shoots)
+    # 打印结果
+    print_result(Hp.toHamiltonian(1), Pauli_sum.to_matrix(), solution)
