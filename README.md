@@ -54,7 +54,7 @@ Running `python qaoa_qiskit.py --help` for more information about options.
 
 The default optimizer is `COBYLA` from Qiskit, as we observe experimentally that it 
 has a more efficient optimization process and guarantees the optimization performance. Note that you can replace
-the optimizer from either [Scipy Methods](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html), 
+the optimizer with either [Scipy Methods](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html), 
 or [Qiskit Optimizers](https://qiskit.org/documentation/stubs/qiskit.algorithms.optimizers.html).
 
 In order to generate the figures that characterize the probability distribution of the final quantum state relative to the Hamiltonian, 
