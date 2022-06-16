@@ -1,11 +1,11 @@
 # Quantum Approximate Optimization Algorithm for Portfolio Optimization Problem
 
 > This is a repository for Portfolio Optimization Problem that use Python code to
-> generate their results (though it can be adapted to use other technologies).
+> generate their results (though it can be adapted to other applications).
 
 ## Software implementation
 
-All source code used to generate the results and figures in the paper are in
+All source code used to generate the results and figures in the project are in
 the `root` directory. Specifically, `portfolio_optimization.py` is used to load and pre-process the portfolio data, 
 which can be obtained in `/data` folder. Running the code in `qaoa.py` generates the results in our project report,
 where the QAOA circuit is constructed using Pyqpanda framework and the parameter optimization is implemented by the optimizer from Scipy or Qiskit. 
