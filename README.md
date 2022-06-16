@@ -56,7 +56,7 @@ Or you can use the same parameter configuration to run the QAOA model based on Q
 
 Running `python qaoa_qiskit.py --help` for more information about options.
 
-The default optimizer is `COBYLA` from Qiskit, as we observe experimentally that it 
+The default optimizer is `COBYLA` from Qiskit, as we empirically observe that it 
 has a more efficient optimization process and guarantees the optimization performance. Note that you can replace
 it with any other optimizers from either [Scipy Methods](https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.minimize.html), 
 or [Qiskit Optimizers](https://qiskit.org/documentation/stubs/qiskit.algorithms.optimizers.html).
