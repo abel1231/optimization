@@ -7,4 +7,5 @@ cvxopt==1.2.6
 xlrd==1.2.0
 scipy==1.8.1
 qiskit==0.36.2
+qiskit[finance]
 matplotlib==3.5.2

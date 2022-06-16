@@ -5,11 +5,11 @@ import argparse
 
 # 初始化参数
 parser = argparse.ArgumentParser()
-parser.add_argument('--num_display', type=int, default=5)
-parser.add_argument('--offset', type=float, default=0.0003)
-parser.add_argument('--path', type=str, default='./out/b2_g1_ly8.out')
-parser.add_argument('--save_path', type=str, default='./outt')
-parser.add_argument('--save_type', type=str, default='svg')
+parser.add_argument('--num_display', type=int, default=5, help='Number of categories displayed in the figure.')
+parser.add_argument('--offset', type=float, default=0.0003, help='Interval of the energy.')
+parser.add_argument('--path', type=str, default='./out/b2_g1_ly8.out', help='Path of the result.')
+parser.add_argument('--save_path', type=str, default='./out', help='Path to save the figure.')
+parser.add_argument('--save_type', type=str, default='svg', help='Save types of the figure.')
 args = parser.parse_args()
 
 path = args.path

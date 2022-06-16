@@ -1,6 +1,6 @@
 import numpy as np
-# from qpsolvers import solve_qp
-# import cvxpy as cp
+from qpsolvers import solve_qp
+import cvxpy as cp
 import pandas as pd
 
 def data_preprocessing(file_path):
